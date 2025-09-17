@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Babel Library | مكتبة بابل
 
 Babel Library is a modern, lightweight web app that combines e-book browsing with a cooking recipes blog. It is fully responsive, supports Arabic (RTL) and English (LTR), and includes light/dark themes with persisted user preferences. The app features Google and email authentication, a book catalog with advanced search and filters, detailed book pages with a PDF reader, recipe listings with rich details and interactions, and a future-ready admin panel.
@@ -141,3 +142,7 @@ ______________________________________________________________________________
 إشعارات (Toast) للتفاعل مع المستخدم.
 
 زر تبديل الوضع الداكن/الفاتح مع حفظ التفضيل.
+=======
+# babel-library
+Babel Library is a modern web app combining e-book browsing and cooking recipes. It features a responsive design with support for Arabic and English (RTL/LTR), light/dark modes, and secure login options. With organized book categories, advanced search, and interactive recipe pages, it offers a seamless user experience.
+>>>>>>> 120dac5f39b61f1296e9b9551c9d03fe041b4179
