@@ -1,0 +1,24 @@
+[
+    {
+        "id": 1,
+        "title": "كتاب عجائب المخلوقات",
+        "category": "psychology",
+        "image": "\/assets\/book\/psychology\/image\/ktab_aagayb_almkhlokat.png",
+        "pdf": "\/assets\/book\/psychology\/pdf\/ktab_aagayb_almkhlokat.pdf",
+        "author": "جرجي زيدان",
+        "description": "كتاب عجائب المخلوقات",
+        "rating": 4.2,
+        "year": 1912
+    },
+    {
+        "id": 2,
+        "title": "داء الاسد",
+        "category": "literature",
+        "image": "\/assets\/book\/literature\/image\/daaa_alasd.png",
+        "pdf": "\/assets\/book\/literature\/pdf\/daaa_alasd.pdf",
+        "author": "أحمد توفيق",
+        "description": "داء الاسد - سلسلة سافاري",
+        "rating": 3,
+        "year": 2011
+    }
+]
