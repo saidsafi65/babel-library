@@ -44,6 +44,7 @@
                         <option value="economics">الاقتصاد</option>
                         <option value="art">الفنون</option>
                         <option value="language">اللغات</option>
+                        <option value="child">أطفال</option>
                     </select>
                     <p class="text-xs text-gray-500 mt-1">يُسمح بالأحرف الإنجليزية والأرقام والشرطة (-) والشرطة السفلية
                         (_).</p>

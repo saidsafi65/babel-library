@@ -18,4 +18,34 @@ class BookController extends Controller
         // حالياً نعيد 404 حتى يتم إنشاء صفحة عرض مفصلة
         abort(404);
     }
+
+    public function read(Request $request, $book)
+    {
+        $user = $request->user();
+        $lastPage = (int) data_get($user->preferences, 'reading_progress.' . $book, 1);
+
+        return response()->view('books.read', [
+            'bookId' => (int) $book,
+            'lastPage' => $lastPage,
+        ]);
+    }
+
+    public function saveProgress(Request $request, $book)
+    {
+        $data = $request->validate([
+            'page' => 'required|integer|min:1',
+        ]);
+
+        $user = $request->user();
+        $prefs = $user->preferences ?? [];
+        $prefs['reading_progress'] = $prefs['reading_progress'] ?? [];
+        $prefs['reading_progress'][(string) $book] = (int) $data['page'];
+        $user->update(['preferences' => $prefs]);
+
+        return response()->json([
+            'success' => true,
+            'book' => (int) $book,
+            'page' => (int) $data['page'],
+        ]);
+    }
 }

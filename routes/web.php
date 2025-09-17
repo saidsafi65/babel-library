@@ -61,6 +61,11 @@ Route::group([
             // رفع كتاب (أدمن فقط) - عرض النموذج وحفظ البيانات
             Route::get('/upload', [BookUploadController::class, 'create'])->middleware(['verified'])->name('upload.create');
             Route::post('/upload', [BookUploadController::class, 'store'])->middleware(['verified'])->name('upload.store');
+
+            // قارئ الكتاب وحفظ التقدم
+            Route::get('/{book}/read', [BookController::class, 'read'])->name('read');
+            Route::post('/{book}/progress', [BookController::class, 'saveProgress'])->name('progress');
+
             Route::get('/{book}', [BookController::class, 'show'])->name('show');
         });
     });

@@ -1,5 +1,6 @@
 <x-app-layout>
-    <div class="container mx-auto px-4 py-8 rtl" dir="rtl">
+    <div class="container mx-auto px-4 py-8" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
+
         {{-- شبكة الكتب (تعبئة ديناميكية من JSON) --}}
         <div id="booksGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"></div>
 
@@ -37,10 +38,12 @@
         </div>
 
         {{-- مودال تفاصيل الكتاب --}}
-        <div id="bookModal" class="fixed inset-0 modal-backdrop hidden z-50 p-4 flex items-center justify-center bg-black bg-opacity-50">
-            <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl max-h-screen overflow-auto relative">
+        <div id="bookModal"
+            class="fixed inset-0 modal-backdrop hidden z-50 p-4 flex items-center justify-center bg-black bg-opacity-50">
+            <div
+                class="max-w-4xl mx-auto bg-white dark:bg-gray-700 rounded-2xl shadow-2xl max-h-screen overflow-auto relative">
                 <div class="flex justify-between items-center p-6 border-b">
-                    <h2 class="text-2xl font-bold text-gray-800">تفاصيل الكتاب</h2>
+                    <h2 class="font-bold text-gray-800 dark:text-white text-2xl">تفاصيل الكتاب</h2>
                     <button onclick="closeBookModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
                         <i class="fas fa-times"></i>
                     </button>
@@ -50,26 +53,50 @@
                         <img id="modalBookCover" src="" alt="غلاف الكتاب"
                             class="w-full max-w-sm mx-auto rounded-xl shadow-lg mb-6">
                         <div class="space-y-3">
-                            <a id="modalReadLink" href="#" target="_blank"
-                                class="w-full inline-block text-center bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-xl font-semibold transition">
-                                <i class="fas fa-play ml-2"></i>
-                                بدء القراءة
-                            </a>
+                            <div class="flex space-x-3">
+                                <!-- زر بدء القراءة -->
+                                <a id="modalReadLink" href="#"
+                                    class="w-full inline-block text-center bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-xl font-semibold transition">
+                                    <i class="fas fa-play ml-2"></i>
+                                    بدء القراءة
+                                </a>
+
+                                <!-- زر تنزيل الكتاب -->
+                                <a id="modalDownloadLink" href="#" target="_blank"
+                                    class="w-full inline-block text-center bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-xl font-semibold transition">
+                                    <i class="fas fa-download ml-2"></i>
+                                    تنزيل الكتاب
+                                </a>
+                            </div>
+
+                            <!-- زر إضافة للمفضلة -->
                             <button
                                 class="w-full border-2 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white py-3 px-6 rounded-xl font-semibold transition">
                                 <i class="fas fa-bookmark ml-2"></i>
                                 إضافة للمفضلة
                             </button>
                         </div>
+
                     </div>
                     <div>
-                        <h3 id="modalBookTitle" class="font-bold text-3xl mb-4 text-gray-800"></h3>
+                        <h3 id="modalBookTitle" class="font-bold text-3xl mb-4 text-gray-800 dark:text-white"></h3>
                         <p id="modalBookAuthor" class="text-purple-600 font-semibold mb-4 text-lg"></p>
-                        <p id="modalBookDescription" class="text-gray-600 text-base mb-6"></p>
+                        <p id="modalBookDescription" class="font-bold text-base mb-6 text-gray-600 dark:text-white"></p>
                         <div class="flex items-center mb-6">
-                            <div id="modalBookRating" class="flex text-yellow-400 text-xl"></div>
-                            <span id="modalBookRatingValue" class="text-gray-600 text-sm mr-3"></span>
-                            <span id="modalBookYear" class="text-gray-500 text-sm"></span>
+                            <!-- نص تقييم الكتاب -->
+                            <div class="font-bold text-gray-600 dark:text-white text-sm mr-2">تقييم الكتاب:</div>
+
+                            <!-- التقييم مع النجوم -->
+                            <div id="modalBookRating" class="flex text-yellow-400 text-xl">
+                                <!-- النجوم ستظهر هنا -->
+                            </div>
+
+                            <span id="modalBookRatingValue"
+                                class="font-bold text-sm text-gray-600 mr-3 dark:text-white"></span>
+
+                            <!-- نص سنة النشر -->
+                            <div class="font-bold text-gray-600 dark:text-white text-sm mr-2">سنة النشر:</div>
+                            <span id="modalBookYear" class="font-bold text-sm text-gray-500 dark:text-white"></span>
                         </div>
                     </div>
                 </div>
@@ -98,25 +125,39 @@
 
         function createBookCard(book) {
             const wrapper = document.createElement('div');
-            wrapper.className = 'book-card bg-white rounded-2xl p-6 shadow-lg border hover:border-purple-200 cursor-pointer';
+            wrapper.className =
+                'book-card bg-white dark:bg-gray-700 rounded-2xl p-6 shadow-lg border hover:border-purple-200 cursor-pointer flex flex-col justify-between min-h-[300px] space-y-4';
             wrapper.setAttribute('onclick', `openBookModal(${book.id})`);
             wrapper.innerHTML = `
                 <div class="relative mb-4">
-                    <img src="${book.image}" alt="غلاف الكتاب" class="book-cover w-full h-64 object-cover rounded-xl">
+                    <img src="${book.image}" alt="غلاف الكتاب" class="book-cover w-full h-80 object-cover rounded-xl shadow-lg">
                     <button class="absolute top-2 left-2 bg-white/80 hover:bg-white text-red-500 w-8 h-8 rounded-full flex items-center justify-center transition">
                         <i class="fas fa-heart"></i>
                     </button>
                 </div>
                 <h3 class="font-bold text-lg mb-2 text-gray-800 line-clamp-2">${book.title}</h3>
                 <p class="text-purple-600 font-semibold mb-2">${book.author || ''}</p>
-                <p class="text-gray-600 text-sm mb-4 line-clamp-3">${book.description || ''}</p>
+                <p class="font-bold text-gray-600 dark:text-white text-sm mb-4 line-clamp-3">${book.description || ''}</p>
                 <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center">
-                        <div class="flex text-yellow-400">${starIcons(book.rating || 0)}</div>
-                        <span class="text-sm text-gray-600 mr-2">(${(book.rating || 0).toFixed ? (book.rating || 0).toFixed(1) : Number(book.rating || 0).toFixed(1)})</span>
+                <div class="flex items-center">
+                        <!-- تقييم الكتاب -->
+                        <div class="font-bold text-gray-600 dark:text-white text-sm mr-2">تقييم الكتاب:</div>
+                        <div class="flex font-bold text-yellow-400 dark:text-white">
+                            ${starIcons(book.rating || 0)}
+                        </div>
+                        <span class="font-bold text-gray-600 dark:text-white text-sm mr-2">(${(book.rating || 0).toFixed ? (book.rating || 0).toFixed(1) : Number(book.rating || 0).toFixed(1)})</span>
                     </div>
-                    <span class="text-sm text-gray-500">${book.year || ''}</span>
+
+                    <!-- سنة النشر -->
+                    <!--
+                    <div class="font-bold text-gray-600 dark:text-white text-sm mr-2">سنة النشر:</div>
+                    <span class="font-bold text-gray-500 dark:text-white text-sm mr-2">${book.publishedYear || ''}</span>
+                    -->
+                    <!-- سنة الكتاب -->
+                    <div class="font-bold text-gray-600 dark:text-white text-sm mr-2">سنة النشر:</div>
+                    <span class="font-bold text-gray-500 dark:text-white text-sm">${book.year || ''}</span>
                 </div>
+
                 <div class="flex space-x-reverse space-x-2">
                     <a href="${book.pdf}" target="_blank" class="flex-1 text-center bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-semibold transition">
                         <i class="fas fa-book-open ml-2"></i>
@@ -147,13 +188,17 @@
 
         async function loadBooks() {
             try {
-                const res = await fetch(BOOKS_JSON_URL, { cache: 'no-cache' });
+                const res = await fetch(BOOKS_JSON_URL, {
+                    cache: 'no-cache'
+                });
                 if (!res.ok) throw new Error('فشل تحميل ملف الكتب');
                 const data = await res.json();
                 if (!Array.isArray(data)) throw new Error('صيغة ملف JSON غير صحيحة');
                 allBooks = data;
                 // جهز خريطة للوصول السريع بالمعرف
-                data.forEach(b => { if (b && b.id != null) booksMap[b.id] = b; });
+                data.forEach(b => {
+                    if (b && b.id != null) booksMap[b.id] = b;
+                });
                 renderedCount = 0;
                 document.getElementById('booksGrid').innerHTML = '';
                 renderNextPage();
@@ -183,7 +228,10 @@
             ratingContainer.innerHTML = starIcons(Number(book.rating || 0));
 
             const readLink = document.getElementById('modalReadLink');
-            readLink.href = book.pdf || '#';
+            const downloadLink = document.getElementById('modalDownloadLink');
+            // توجيه لصفحة القارئ الجديدة حتى نحفظ التقدم
+            readLink.href = `/${'{{ app()->getLocale() }}'}/books/${book.id}/read`;
+            downloadLink.href = book.pdf || '#';
 
             document.getElementById('bookModal').classList.remove('hidden');
         }
@@ -199,5 +247,81 @@
                 if (e.target.id === 'bookModal') closeBookModal();
             });
         });
+        // دالة لإنشاء النجوم باستخدام Unicode (لا تحتاج لمكتبة خارجية)
+        function starIcons(rating) {
+            const fullStars = Math.floor(rating); // النجوم المكتملة
+            const hasHalfStar = rating % 1 >= 0.5; // نجمة نصف إذا كان الكسر 0.5 أو أكثر
+            const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0); // النجوم الفارغة
+
+            let stars = '';
+
+            // النجوم المكتملة (ذهبية)
+            for (let i = 0; i < fullStars; i++) {
+                stars += '<span class="text-yellow-400">★</span>';
+            }
+
+            // النجمة النصف إذا وجدت
+            if (hasHalfStar) {
+                stars += '<span class="text-yellow-400">☆</span>'; // أو يمكن استخدام ★ بشفافية
+            }
+
+            // النجوم الفارغة
+            for (let i = 0; i < emptyStars; i++) {
+                stars += '<span class="text-gray-300">☆</span>';
+            }
+
+            return stars;
+        }
+
+        // نسخة محسنة مع Font Awesome (إذا كانت متوفرة)
+        function starIconsFA(rating) {
+            const fullStars = Math.floor(rating);
+            const hasHalfStar = rating % 1 >= 0.5;
+            const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+            let stars = '';
+
+            // النجوم المكتملة
+            for (let i = 0; i < fullStars; i++) {
+                stars += '<i class="fas fa-star text-yellow-400"></i>';
+            }
+
+            // النجمة النصف
+            if (hasHalfStar) {
+                stars += '<i class="fas fa-star-half-alt text-yellow-400"></i>';
+            }
+
+            // النجوم الفارغة
+            for (let i = 0; i < emptyStars; i++) {
+                stars += '<i class="far fa-star text-gray-300 dark:text-gray-600"></i>';
+            }
+
+            return stars;
+        }
+
+        // الكود المحدث لعرض التقييم
+        const ratingHTML = `
+            <div class="flex items-center">
+                <div class="flex font-bold text-yellow-400 dark:text-white">
+                    ${starIcons(book.rating || 0)}
+                </div>
+                <span class="font-bold text-gray-600 dark:text-white text-sm mr-2 ml-1">
+                    (${(book.rating || 0).toFixed ? (book.rating || 0).toFixed(1) : Number(book.rating || 0).toFixed(1)})
+                </span>
+            </div>`;
+
+        // إذا كنت تريد عرض النجوم فقط بدون الرقم:
+        const starsOnlyHTML = `
+            <div class="flex items-center">
+                <div class="flex font-bold">
+                    ${starIcons(book.rating || 0)}
+                </div>
+            </div>`;
+
+        // مثال للاستخدام مع كتاب له تقييم 4.3
+        const book = {
+            rating: 4.3
+        };
+        console.log(starIcons(book.rating)); // سيعرض 4 نجوم مكتملة ونصف نجمة ونجمة فارغة
     </script>
 </x-app-layout>

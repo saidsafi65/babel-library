@@ -20,5 +20,27 @@
         "description": "داء الاسد - سلسلة سافاري",
         "rating": 3,
         "year": 2011
+    },
+    {
+        "id": 3,
+        "title": "جحا واللحم العجيب",
+        "category": "child",
+        "image": "\/assets\/book\/child\/image\/gha_oallhm_alaagyb.png",
+        "pdf": "\/assets\/book\/child\/pdf\/gha_oallhm_alaagyb.pdf",
+        "author": "شوقي حسن",
+        "description": "رواية جحا واللحم العجيب  - شوقي حسن",
+        "rating": 3.6,
+        "year": 2002
+    },
+    {
+        "id": 4,
+        "title": "كتاب المحنة في واقع الحركة الإسلامية المعاصرة",
+        "category": "religion",
+        "image": "\/assets\/book\/religion\/image\/ktab_almhn_fy_oakaa_alhrk_alaslamy_almaaasr.png",
+        "pdf": "\/assets\/book\/religion\/pdf\/ktab_almhn_fy_oakaa_alhrk_alaslamy_almaaasr.pdf",
+        "author": "يوسف القرضاوي",
+        "description": "كتاب المحنة في واقع الحركة الإسلامية المعاصرة - يوسف القرضاوي",
+        "rating": null,
+        "year": 2008
     }
 ]
