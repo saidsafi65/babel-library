@@ -64,6 +64,8 @@ Route::group([
 
             // قارئ الكتاب وحفظ التقدم
             Route::get('/{book}/read', [BookController::class, 'read'])->name('read');
+            //
+            Route::get('/{book}/pdf', [BookController::class, 'viewPdf'])->name('book.pdf');
             Route::post('/{book}/progress', [BookController::class, 'saveProgress'])->name('progress');
 
             Route::get('/{book}', [BookController::class, 'show'])->name('show');

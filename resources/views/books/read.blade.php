@@ -24,7 +24,7 @@
 
             <div id="viewerWrapper" class="w-full overflow-hidden bg-gray-100 dark:bg-gray-900 rounded-lg" style="min-height:70vh;">
                 <!-- نعرض من خلال عارض المتصفح فقط مع إخفاء أي أدوات -->
-                <iframe id="pdfIframe" class="w-full h-full" style="min-height:70vh; border:0;" referrerpolicy="no-referrer"></iframe>
+                <iframe id="pdfIframe" src="{{ route('books.book.pdf', $bookId) }}#page={{ $lastPage }}" class="w-full h-full" style="min-height:70vh; border:0;" referrerpolicy="no-referrer"></iframe>
             </div>
         </div>
     </div>
