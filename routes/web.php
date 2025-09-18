@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserPreferencesController;
 use App\Http\Controllers\BookUploadController;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Storage;
 use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
 
 
@@ -50,7 +51,7 @@ Route::group([
         // Routes خاصة بالكتب (سنضيفها لاحقاً)
         Route::prefix('books')->name('books.')->group(function () {
             Route::get('/', [BookController::class, 'index'])->name('index'); // هنا '/'
-                        Route::get('/favorites', function () {
+            Route::get('/favorites', function () {
                 return view('books.favorites');
             })->name('favorites');
 
@@ -93,11 +94,115 @@ Route::group([
     })->name('language.switch');
 });
 
+Route::get('/test-storage', function () {
+    return [
+        'storage_path' => storage_path(),
+        'public_path' => public_path(),
+        'books_json_exists' => file_exists(public_path('assets/book/books.json')),
+        'storage_books_dir' => Storage::files('books'),
+        'default_disk' => config('filesystems.default')
+    ];
+});
+
 Route::get('/fix-config', function () {
     Artisan::call('config:clear');
     Artisan::call('cache:clear');
     Artisan::call('config:cache');
     return '✅ تم مسح الكاش بنجاح';
+});
+
+// روت تشخيص مبسط - أضفه في web.php
+Route::get('/debug-books/{book?}', function ($book = null) {
+    $jsonPath = public_path('assets/book/books.json');
+
+    $debug = [];
+
+    // فحص المسارات
+    $debug['paths'] = [
+        'JSON Path' => $jsonPath,
+        'JSON Exists' => file_exists($jsonPath) ? '✅ YES' : '❌ NO',
+        'Public Path' => public_path(),
+        'Storage Path' => storage_path('app'),
+    ];
+
+    // فحص storage
+    $debug['storage'] = [
+        'Default Disk' => config('filesystems.default'),
+        'Books Folder' => Storage::exists('books') ? '✅ EXISTS' : '❌ NOT FOUND',
+        'Files Count' => count(Storage::exists('books') ? Storage::files('books') : [])
+    ];
+
+    // فحص JSON
+    if (file_exists($jsonPath)) {
+        $content = file_get_contents($jsonPath);
+        $books = json_decode($content, true);
+
+        $debug['json'] = [
+            'File Size' => strlen($content) . ' bytes',
+            'Valid JSON' => is_array($books) ? '✅ YES' : '❌ NO',
+            'Books Count' => is_array($books) ? count($books) : 0,
+        ];
+
+        if (is_array($books)) {
+            $debug['books_list'] = [];
+            foreach ($books as $b) {
+                $debug['books_list'][] = [
+                    'ID' => $b['id'] ?? 'NO ID',
+                    'Title' => $b['title'] ?? 'NO TITLE',
+                    'PDF' => $b['pdf'] ?? 'NO PDF',
+                ];
+            }
+        }
+
+        // فحص كتاب محدد
+        if ($book) {
+            $bookData = collect($books ?: [])->firstWhere('id', (int) $book);
+            $debug['specific_book'] = [
+                'Requested ID' => $book,
+                'Found' => $bookData ? '✅ YES' : '❌ NO',
+                'Data' => $bookData ?: 'NOT FOUND'
+            ];
+
+            if ($bookData) {
+                $pdfPaths = [
+                    "books/{$bookData['pdf']}" => Storage::exists("books/{$bookData['pdf']}"),
+                    "books/{$book}.pdf" => Storage::exists("books/{$book}.pdf"),
+                ];
+
+                $debug['pdf_files'] = [];
+                foreach ($pdfPaths as $path => $exists) {
+                    $debug['pdf_files'][$path] = $exists ? '✅ EXISTS' : '❌ NOT FOUND';
+                }
+            }
+        }
+    } else {
+        $debug['json'] = ['error' => '❌ books.json file not found!'];
+    }
+
+    // إرجاع النتيجة كـ HTML مقروء
+    $html = '<div style="font-family: monospace; background: #f5f5f5; padding: 20px;">';
+    $html .= '<h2>🔍 Book System Debug Report</h2>';
+
+    foreach ($debug as $section => $data) {
+        $html .= "<h3>📋 " . ucwords(str_replace('_', ' ', $section)) . "</h3>";
+        $html .= '<ul>';
+
+        if (is_array($data)) {
+            foreach ($data as $key => $value) {
+                if (is_array($value)) {
+                    $html .= "<li><strong>$key:</strong><pre>" . print_r($value, true) . "</pre></li>";
+                } else {
+                    $html .= "<li><strong>$key:</strong> $value</li>";
+                }
+            }
+        }
+
+        $html .= '</ul><hr>';
+    }
+
+    $html .= '</div>';
+
+    return $html;
 });
 
 require __DIR__ . '/auth.php';

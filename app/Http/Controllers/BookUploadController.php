@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class BookUploadController extends Controller
 {
@@ -39,16 +40,14 @@ class BookUploadController extends Controller
         ]);
 
         $category = strtolower($data['category']);
-        $baseDir = public_path('assets/book/' . $category);
-        $pdfDir = $baseDir . DIRECTORY_SEPARATOR . 'pdf';
-        $imgDir = $baseDir . DIRECTORY_SEPARATOR . 'image';
+
+        // مسارات التخزين على قرص public (storage/app/public)
+        $pdfDir = "assets/book/{$category}/pdf";
+        $imgDir = "assets/book/{$category}/image";
 
         // إنشاء المجلدات إن لم تكن موجودة
-        foreach ([$baseDir, $pdfDir, $imgDir] as $dir) {
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
-            }
-        }
+        Storage::disk('public')->makeDirectory($pdfDir);
+        Storage::disk('public')->makeDirectory($imgDir);
 
         // إنشاء اسم أساسي موحّد من العنوان لاستخدامه لكلا الملفين
         $baseName = Str::slug($data['title'], '_');
@@ -59,8 +58,13 @@ class BookUploadController extends Controller
         // ضمان عدم التكرار: إذا كان موجوداً، ألحق عداداً
         $candidate = $baseName;
         $i = 1;
-        while (file_exists($pdfDir . DIRECTORY_SEPARATOR . $candidate . '.pdf') ||
-               file_exists($imgDir . DIRECTORY_SEPARATOR . $candidate)) {
+        while (
+            Storage::disk('public')->exists($pdfDir . '/' . $candidate . '.pdf') ||
+            Storage::disk('public')->exists($imgDir . '/' . $candidate . '.jpg') ||
+            Storage::disk('public')->exists($imgDir . '/' . $candidate . '.jpeg') ||
+            Storage::disk('public')->exists($imgDir . '/' . $candidate . '.png') ||
+            Storage::disk('public')->exists($imgDir . '/' . $candidate . '.webp')
+        ) {
             $candidate = $baseName . '_' . $i++;
         }
         $baseName = $candidate;
@@ -68,19 +72,19 @@ class BookUploadController extends Controller
         // حفظ PDF
         $pdfFile = $request->file('pdf');
         $pdfName = $baseName . '.pdf';
-        $pdfFile->move($pdfDir, $pdfName);
+        $pdfFile->storeAs($pdfDir, $pdfName, 'public');
 
         // حفظ الصورة بنفس الاسم الأساس مع لاحقة الامتداد الفعلي
         $imgFile = $request->file('image');
         $imgExt = strtolower($imgFile->getClientOriginalExtension());
         $imgName = $baseName . '.' . $imgExt; // نفس الاسم بالضبط مع اختلاف الامتداد
-        $imgFile->move($imgDir, $imgName);
+        $imgFile->storeAs($imgDir, $imgName, 'public');
 
-        // تحديث ملف JSON
-        $jsonPath = public_path('assets/book/books.json');
+        // قراءة/تحديث ملف JSON من قرص public
+        $jsonRelativePath = 'assets/book/books.json';
         $books = [];
-        if (file_exists($jsonPath)) {
-            $raw = file_get_contents($jsonPath);
+        if (Storage::disk('public')->exists($jsonRelativePath)) {
+            $raw = Storage::disk('public')->get($jsonRelativePath);
             $decoded = json_decode($raw, true);
             if (is_array($decoded)) {
                 $books = $decoded;
@@ -91,7 +95,7 @@ class BookUploadController extends Controller
         $nextId = 1;
         foreach ($books as $b) {
             if (isset($b['id']) && is_numeric($b['id'])) {
-                $nextId = max($nextId, (int)$b['id'] + 1);
+                $nextId = max($nextId, (int) $b['id'] + 1);
             }
         }
 
@@ -99,16 +103,16 @@ class BookUploadController extends Controller
             'id' => $nextId,
             'title' => $data['title'],
             'category' => $category,
-            'image' => '/assets/book/' . $category . '/image/' . $imgName,
-            'pdf' => '/assets/book/' . $category . '/pdf/' . $pdfName,
+            'image' => '/storage/' . $imgDir . '/' . $imgName,
+            'pdf' => '/storage/' . $pdfDir . '/' . $pdfName,
             'author' => $data['author'] ?? null,
             'description' => $data['description'] ?? null,
-            'rating' => isset($data['rating']) ? (float)$data['rating'] : null,
-            'year' => (int)$data['year'],
+            'rating' => isset($data['rating']) ? (float) $data['rating'] : null,
+            'year' => (int) $data['year'],
         ];
 
         $books[] = $newBook;
-        file_put_contents($jsonPath, json_encode($books, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        Storage::disk('public')->put($jsonRelativePath, json_encode($books, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
         return redirect()->back()->with('success', 'تم رفع الكتاب وإضافته بنجاح ✅');
     }

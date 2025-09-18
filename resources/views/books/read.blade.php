@@ -6,188 +6,332 @@
         </div>
 
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4">
-            <div id="errorBox" class="mb-3 hidden text-sm text-red-600"></div>
-            <div class="flex items-center justify-between mb-4 gap-2">
+            <div id="errorBox" class="mb-3 hidden text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800"></div>
+
+            <!-- شريط التحكم -->
+            <div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
                 <div class="flex items-center gap-2">
-                    <button id="prevPage" class="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600">السابق</button>
-                    <button id="nextPage" class="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600">التالي</button>
+                    <button id="prevPage" class="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">السابق</button>
+                    <button id="nextPage" class="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">التالي</button>
                     <div class="flex items-center gap-2 mx-2">
                         <span class="text-sm text-gray-600 dark:text-gray-300">الصفحة:</span>
-                        <input id="pageNum" type="number" class="w-20 px-2 py-1 rounded-lg border dark:bg-gray-700" min="1" value="{{ (int) ($lastPage ?? 1) }}">
-                        <span id="pageCount" class="text-sm text-gray-600 dark:text-gray-300">/ ?</span>
+                        <input id="pageNum" type="number" class="w-20 px-2 py-1 rounded-lg border dark:bg-gray-700 dark:border-gray-600" min="1" value="{{ (int) ($lastPage ?? 1) }}">
+                        <span id="pageCount" class="text-sm text-gray-600 dark:text-gray-300">/ <span id="totalPages">?</span></span>
                     </div>
                 </div>
+
+                <!-- معلومات الحفظ والتحميل -->
                 <div class="flex items-center gap-2">
+                    <div id="loadingIndicator" class="hidden">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                    </div>
                     <span id="saveStatus" class="text-sm text-gray-500">لم يتم الحفظ بعد</span>
                 </div>
             </div>
 
-            <div id="viewerWrapper" class="w-full overflow-hidden bg-gray-100 dark:bg-gray-900 rounded-lg" style="min-height:70vh;">
-                <!-- نعرض من خلال عارض المتصفح فقط مع إخفاء أي أدوات -->
-                <iframe id="pdfIframe" src="{{ route('books.book.pdf', $bookId) }}#page={{ $lastPage }}" class="w-full h-full" style="min-height:70vh; border:0;" referrerpolicy="no-referrer"></iframe>
+            <!-- عارض PDF -->
+            <div id="viewerWrapper" class="w-full overflow-hidden bg-gray-100 dark:bg-gray-900 rounded-lg border" style="min-height:70vh;">
+                <iframe id="pdfIframe"
+                        src="{{ route('books.book.pdf', $bookId) }}#page={{ $lastPage }}"
+                        class="w-full h-full"
+                        style="min-height:70vh; border:0;"
+                        referrerpolicy="no-referrer"
+                        loading="lazy">
+                </iframe>
             </div>
         </div>
     </div>
 
-    <!-- نحمّل PDF.js فقط لاستخراج عدد الصفحات -->
+    <!-- PDF.js للتحكم في الصفحات -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
-        // متغيرات من السيرفر
-        const BOOK_ID = {{ (int) ($bookId ?? 0) }};
-        const LAST_PAGE = {{ (int) ($lastPage ?? 1) }};
-        const LOCALE = "{{ app()->getLocale() }}";
-        const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        const BOOKS_JSON_URL = '/assets/book/books.json';
+        // متغيرات الإعداد
+        const CONFIG = {
+            BOOK_ID: {{ (int) ($bookId ?? 0) }},
+            LAST_PAGE: {{ (int) ($lastPage ?? 1) }},
+            LOCALE: "{{ app()->getLocale() }}",
+            CSRF_TOKEN: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            BOOKS_JSON_URL: '/assets/book/books.json',
+            SAVE_DEBOUNCE_TIME: 600,
+            MAX_RETRIES: 3
+        };
 
         // عناصر DOM
-        const prevBtn = document.getElementById('prevPage');
-        const nextBtn = document.getElementById('nextPage');
-        const pageNumInput = document.getElementById('pageNum');
-        const pageCountSpan = document.getElementById('pageCount');
-        const saveStatus = document.getElementById('saveStatus');
-        const titleEl = document.getElementById('bookTitle');
-        const iframe = document.getElementById('pdfIframe');
-        const errorBox = document.getElementById('errorBox');
+        const elements = {
+            prevBtn: document.getElementById('prevPage'),
+            nextBtn: document.getElementById('nextPage'),
+            pageNumInput: document.getElementById('pageNum'),
+            pageCountSpan: document.getElementById('pageCount'),
+            totalPagesSpan: document.getElementById('totalPages'),
+            saveStatus: document.getElementById('saveStatus'),
+            titleEl: document.getElementById('bookTitle'),
+            iframe: document.getElementById('pdfIframe'),
+            errorBox: document.getElementById('errorBox'),
+            loadingIndicator: document.getElementById('loadingIndicator')
+        };
 
-        // pdf.js إعداد لاستخراج عدد الصفحات فقط
+        // إعداد PDF.js
         const pdfjsLib = window['pdfjsLib'] || window['pdfjs-dist/build/pdf'];
-        if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+        if (pdfjsLib?.GlobalWorkerOptions) {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         }
 
-        let currentPage = Math.max(1, LAST_PAGE || 1);
-        let totalPages = 0;
-        let pdfBuffer = null;
-        let blobUrl = null;
+        // متغيرات الحالة
+        let state = {
+            currentPage: Math.max(1, CONFIG.LAST_PAGE || 1),
+            totalPages: 0,
+            pdfBuffer: null,
+            blobUrl: null,
+            saveTimer: null,
+            retryCount: 0
+        };
+
+        // دوال المساعدة
+        function showError(message) {
+            if (elements.errorBox) {
+                elements.errorBox.textContent = message;
+                elements.errorBox.classList.remove('hidden');
+            }
+            console.error('خطأ في قارئ PDF:', message);
+        }
+
+        function hideError() {
+            if (elements.errorBox) {
+                elements.errorBox.classList.add('hidden');
+            }
+        }
+
+        function showLoading(show = true) {
+            if (elements.loadingIndicator) {
+                elements.loadingIndicator.classList.toggle('hidden', !show);
+            }
+        }
+
+        function updateButtonStates() {
+            if (elements.prevBtn) {
+                elements.prevBtn.disabled = state.currentPage <= 1;
+            }
+            if (elements.nextBtn) {
+                elements.nextBtn.disabled = state.currentPage >= state.totalPages;
+            }
+        }
 
         function updateIframe() {
-            if (!blobUrl && pdfBuffer) {
-                const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
-                blobUrl = URL.createObjectURL(blob);
+            if (!state.blobUrl && state.pdfBuffer) {
+                const blob = new Blob([state.pdfBuffer], { type: 'application/pdf' });
+                state.blobUrl = URL.createObjectURL(blob);
             }
-            if (blobUrl) {
-                // إخفاء الواجهات قدر الإمكان + ملاءمة العرض عرض الصفحة
-                const params = `#page=${currentPage}&zoom=page-width&toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0&view=FitH`;
-                iframe.src = blobUrl + params;
+
+            if (state.blobUrl) {
+                const params = `#page=${state.currentPage}&zoom=page-width&toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0&view=FitH`;
+                elements.iframe.src = state.blobUrl + params;
             }
+
+            updateButtonStates();
         }
 
-        // حفظ التقدم للمستخدم
-        let saveTimer = null;
+        // حفظ التقدم مع معالجة الأخطاء
         function debounceSave(page) {
-            if (saveTimer) clearTimeout(saveTimer);
-            saveTimer = setTimeout(() => saveProgress(page), 600);
+            if (state.saveTimer) clearTimeout(state.saveTimer);
+            state.saveTimer = setTimeout(() => saveProgress(page), CONFIG.SAVE_DEBOUNCE_TIME);
         }
-        async function saveProgress(page) {
+
+        async function saveProgress(page, retryCount = 0) {
+            if (!CONFIG.CSRF_TOKEN) {
+                elements.saveStatus.textContent = 'لم يتم تسجيل الدخول';
+                return;
+            }
+
             try {
-                saveStatus.textContent = 'جاري الحفظ...';
-                const res = await fetch(`/${LOCALE}/books/${BOOK_ID}/progress`, {
+                showLoading(true);
+                elements.saveStatus.textContent = 'جاري الحفظ...';
+
+                const response = await fetch(`/${CONFIG.LOCALE}/books/${CONFIG.BOOK_ID}/progress`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': CSRF_TOKEN,
+                        'X-CSRF-TOKEN': CONFIG.CSRF_TOKEN,
                         'Accept': 'application/json'
                     },
                     body: JSON.stringify({ page })
                 });
-                if (!res.ok) throw new Error('خطأ في حفظ التقدم');
-                saveStatus.textContent = `تم الحفظ (صفحة ${page})`;
-            } catch (e) {
-                console.error(e);
-                saveStatus.textContent = 'تعذر الحفظ';
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                elements.saveStatus.textContent = `تم الحفظ (صفحة ${page})`;
+                state.retryCount = 0;
+
+            } catch (error) {
+                console.error('خطأ في الحفظ:', error);
+
+                if (retryCount < CONFIG.MAX_RETRIES) {
+                    setTimeout(() => saveProgress(page, retryCount + 1), 1000 * (retryCount + 1));
+                    elements.saveStatus.textContent = `جاري المحاولة مرة أخرى... (${retryCount + 1}/${CONFIG.MAX_RETRIES})`;
+                } else {
+                    elements.saveStatus.textContent = 'تعذر الحفظ';
+                }
+            } finally {
+                showLoading(false);
             }
         }
 
+        // دوال التنقل
         function showPrevPage() {
-            if (currentPage <= 1) return;
-            currentPage--;
-            pageNumInput.value = currentPage;
+            if (state.currentPage <= 1) return;
+            state.currentPage--;
+            elements.pageNumInput.value = state.currentPage;
             updateIframe();
-            debounceSave(currentPage);
+            debounceSave(state.currentPage);
         }
+
         function showNextPage() {
-            if (currentPage >= totalPages) return;
-            currentPage++;
-            pageNumInput.value = currentPage;
+            if (state.currentPage >= state.totalPages) return;
+            state.currentPage++;
+            elements.pageNumInput.value = state.currentPage;
             updateIframe();
-            debounceSave(currentPage);
+            debounceSave(state.currentPage);
         }
+
         function jumpToPage(num) {
-            const n = Math.min(totalPages, Math.max(1, parseInt(num || 1)));
-            currentPage = n;
-            pageNumInput.value = currentPage;
+            const pageNum = Math.min(state.totalPages, Math.max(1, parseInt(num || 1)));
+            if (pageNum === state.currentPage) return;
+
+            state.currentPage = pageNum;
+            elements.pageNumInput.value = state.currentPage;
             updateIframe();
-            debounceSave(currentPage);
+            debounceSave(state.currentPage);
         }
 
-        async function init() {
+        // تهيئة التطبيق
+        async function initializeApp() {
             try {
-                const res = await fetch(BOOKS_JSON_URL, { cache: 'no-cache' });
-                if (!res.ok) throw new Error('تعذر تحميل قائمة الكتب');
-                const books = await res.json();
-                const book = (Array.isArray(books) ? books : []).find(b => b && Number(b.id) === Number(BOOK_ID));
-                if (!book || !book.pdf) throw new Error('لم يتم العثور على رابط PDF لهذا الكتاب');
+                hideError();
+                showLoading(true);
 
-                // عنوان الصفحة
+                // جلب بيانات الكتب
+                const booksResponse = await fetch(CONFIG.BOOKS_JSON_URL, {
+                    cache: 'no-cache',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!booksResponse.ok) {
+                    throw new Error('تعذر تحميل قائمة الكتب');
+                }
+
+                const books = await booksResponse.json();
+                const book = (Array.isArray(books) ? books : []).find(b =>
+                    b && Number(b.id) === Number(CONFIG.BOOK_ID)
+                );
+
+                if (!book?.pdf) {
+                    throw new Error('لم يتم العثور على رابط PDF لهذا الكتاب');
+                }
+
+                // تحديث العنوان
                 if (book.title) {
-                    titleEl.textContent = `قراءة: ${book.title}`;
+                    elements.titleEl.textContent = `قراءة: ${book.title}`;
                     document.title = `${book.title} - قارئ PDF`;
                 }
 
-                // جلب الملف كـ ArrayBuffer لمنع التقاط IDM واستخدامه كـ Blob
-                const pdfRes = await fetch(book.pdf, { cache: 'no-store', credentials: 'same-origin' });
-                if (!pdfRes.ok) throw new Error(`تعذر تحميل ملف PDF (HTTP ${pdfRes.status})`);
-                pdfBuffer = await pdfRes.arrayBuffer();
+                // جلب ملف PDF
+                const pdfResponse = await fetch(book.pdf, {
+                    cache: 'no-store',
+                    credentials: 'same-origin'
+                });
 
-                // استخدام PDF.js لاستخراج عدد الصفحات فقط (دعم العربية عبر CMap والخطوط القياسية)
-                if (!pdfjsLib) throw new Error('تعذر تحميل مكتبة PDF.js');
+                if (!pdfResponse.ok) {
+                    throw new Error(`تعذر تحميل ملف PDF (HTTP ${pdfResponse.status})`);
+                }
+
+                state.pdfBuffer = await pdfResponse.arrayBuffer();
+
+                // استخراج عدد الصفحات
+                if (!pdfjsLib) {
+                    throw new Error('تعذر تحميل مكتبة PDF.js');
+                }
+
                 const loadingTask = pdfjsLib.getDocument({
-                    data: new Uint8Array(pdfBuffer),
+                    data: new Uint8Array(state.pdfBuffer),
                     cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
                     cMapPacked: true,
                     standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/',
                     enableXfa: true,
                     fontExtraProperties: true,
                 });
-                const pdfDoc = await loadingTask.promise;
-                totalPages = pdfDoc.numPages || 0;
-                pageCountSpan.textContent = `/ ${totalPages}`;
 
-                // ابدأ من آخر صفحة محفوظة ضمن الحدود
-                currentPage = Math.min(totalPages || 1, Math.max(1, currentPage || 1));
-                pageNumInput.value = currentPage;
+                const pdfDoc = await loadingTask.promise;
+                state.totalPages = pdfDoc.numPages || 0;
+                elements.totalPagesSpan.textContent = state.totalPages;
+
+                // تحديد الصفحة الحالية
+                state.currentPage = Math.min(state.totalPages || 1, Math.max(1, state.currentPage || 1));
+                elements.pageNumInput.value = state.currentPage;
+                elements.pageNumInput.max = state.totalPages;
 
                 updateIframe();
-            } catch (e) {
-                console.error(e);
-                pageCountSpan.textContent = '/ 0';
-                if (errorBox) {
-                    errorBox.textContent = e.message || 'تعذر تحميل أو عرض الكتاب';
-                    errorBox.classList.remove('hidden');
-                }
+
+            } catch (error) {
+                showError(error.message || 'تعذر تحميل أو عرض الكتاب');
+                elements.totalPagesSpan.textContent = '0';
+            } finally {
+                showLoading(false);
             }
         }
 
-        // أحداث التحكم
-        prevBtn.addEventListener('click', showPrevPage);
-        nextBtn.addEventListener('click', showNextPage);
-        pageNumInput.addEventListener('change', () => jumpToPage(pageNumInput.value));
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowRight') {
-                showNextPage();
-            } else if (e.key === 'ArrowLeft') {
-                showPrevPage();
-            }
-        });
-        window.addEventListener('beforeunload', () => {
-            saveProgress(currentPage);
-            if (blobUrl) URL.revokeObjectURL(blobUrl);
-        });
+        // ربط الأحداث
+        function bindEvents() {
+            elements.prevBtn?.addEventListener('click', showPrevPage);
+            elements.nextBtn?.addEventListener('click', showNextPage);
+            elements.pageNumInput?.addEventListener('change', (e) => jumpToPage(e.target.value));
+            elements.pageNumInput?.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    jumpToPage(e.target.value);
+                }
+            });
 
+            // اختصارات لوحة المفاتيح
+            window.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT') return;
+
+                switch (e.key) {
+                    case 'ArrowRight':
+                    case 'PageDown':
+                        e.preventDefault();
+                        showNextPage();
+                        break;
+                    case 'ArrowLeft':
+                    case 'PageUp':
+                        e.preventDefault();
+                        showPrevPage();
+                        break;
+                }
+            });
+
+            // حفظ عند إغلاق الصفحة
+            window.addEventListener('beforeunload', () => {
+                if (state.saveTimer) {
+                    clearTimeout(state.saveTimer);
+                    saveProgress(state.currentPage);
+                }
+                if (state.blobUrl) {
+                    URL.revokeObjectURL(state.blobUrl);
+                }
+            });
+        }
+
+        // بدء التطبيق
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
+            document.addEventListener('DOMContentLoaded', () => {
+                bindEvents();
+                initializeApp();
+            });
         } else {
-            init();
+            bindEvents();
+            initializeApp();
         }
     </script>
 </x-app-layout>
