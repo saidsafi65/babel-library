@@ -32,11 +32,15 @@
             <!-- عارض PDF -->
             <div id="viewerWrapper" class="w-full overflow-hidden bg-gray-100 dark:bg-gray-900 rounded-lg border" style="min-height:70vh;">
                 <iframe id="pdfIframe"
-                        src="{{ route('books.book.pdf', $bookId) }}#page={{ $lastPage }}"
+                        src="{{ route('books.book.pdf', $bookId) }}#page={{ $lastPage }}&toolbar=0&view=FitH"
                         class="w-full h-full"
                         style="min-height:70vh; border:0;"
+                        sandbox="allow-same-origin allow-scripts"
                         referrerpolicy="no-referrer"
-                        loading="lazy">
+                        loading="lazy"
+                        oncontextmenu="return false;"
+                        onselectstart="return false;"
+                        onmousedown="return false;">
                 </iframe>
             </div>
         </div>
@@ -237,10 +241,32 @@
                     document.title = `${book.title} - قارئ PDF`;
                 }
 
-                // جلب ملف PDF
+                // طلب توكن عبر AJAX أولاً (الـ controller يعيد توكن عند الطلبات AJAX)
+                let token = '{{ $pdfToken ?? "" }}';
+                try {
+                    const tokenResp = await fetch(book.pdf, {
+                        method: 'GET',
+                        credentials: 'same-origin',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    if (tokenResp.ok) {
+                        const json = await tokenResp.json().catch(() => ({}));
+                        if (json && json.token) token = json.token;
+                    }
+                } catch (err) {
+                    // فشل الحصول على التوكن — سنحاول المتابعة بدون توكن
+                    console.warn('تعذر الحصول على توكن PDF:', err);
+                }
+
+                // الآن نطلب الملف الفعلي بصيغة ثنائية مع توكن الجلسة (إن وُجد)
                 const pdfResponse = await fetch(book.pdf, {
                     cache: 'no-store',
-                    credentials: 'same-origin'
+                    credentials: 'same-origin',
+                    headers: token ? { 'X-PDF-Token': token } : {}
                 });
 
                 if (!pdfResponse.ok) {

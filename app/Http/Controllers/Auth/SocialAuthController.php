@@ -36,6 +36,6 @@ class SocialAuthController extends Controller
         );
 
         Auth::login($user, true); // تسجيل دخول وحفظ الجلسة
-        return redirect()->intended('/dashboard'); // أو أي صفحة تريدها
+        return redirect()->intended(route('books.index')); // التوجيه لصفحة الكتب
     }
 }
