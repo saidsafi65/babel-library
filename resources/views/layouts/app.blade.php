@@ -12,9 +12,14 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ config('app.name', 'Laravel') }}</title>
-    <link rel="icon" type="image/png" href="{{ asset('assets/logo/babel-logo.png') }}">
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('assets/logo/babel-logo.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('assets/logo/babel-logo.png') }}">
     <link rel="shortcut icon" href="{{ asset('assets/logo/babel-logo.png') }}">
-    <link rel="apple-touch-icon" href="{{ asset('assets/logo/babel-logo.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('assets/logo/babel-logo.png') }}">
+    <meta name="msapplication-TileImage" content="{{ asset('assets/logo/babel-logo.png') }}">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="theme-color" content="#ffffff">
     <link rel="stylesheet" href="{{ asset('css/custom.css') }}">
     <script src="{{ asset('js/babel.js') }}"></script>
     <!-- Fonts -->

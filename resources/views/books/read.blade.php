@@ -15,8 +15,8 @@
                     <button id="nextPage" class="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">التالي</button>
                     <div class="flex items-center gap-2 mx-2">
                         <span class="text-sm text-gray-600 dark:text-gray-300">الصفحة:</span>
-                        <input id="pageNum" type="number" class="w-20 px-2 py-1 rounded-lg border dark:bg-gray-700 dark:border-gray-600" min="1" value="{{ (int) ($lastPage ?? 1) }}">
-                        <span id="pageCount" class="text-sm text-gray-600 dark:text-gray-300">/ <span id="totalPages">?</span></span>
+                        <input id="pageNum" type="number" class="w-20 px-2 py-1 rounded-lg border dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" min="1" value="{{ (int) ($lastPage ?? 1) }}">
+                        <span id="pageCount" class="text-sm text-gray-600 dark:text-gray-300">/ <span id="totalPages">0</span></span>
                     </div>
                 </div>
 
@@ -25,23 +25,13 @@
                     <div id="loadingIndicator" class="hidden">
                         <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
                     </div>
-                    <span id="saveStatus" class="text-sm text-gray-500">لم يتم الحفظ بعد</span>
+                    <span id="saveStatus" class="text-sm text-gray-500 dark:text-gray-400">جاري التحميل...</span>
                 </div>
             </div>
 
             <!-- عارض PDF -->
-            <div id="viewerWrapper" class="w-full overflow-hidden bg-gray-100 dark:bg-gray-900 rounded-lg border" style="min-height:70vh;">
-                <iframe id="pdfIframe"
-                        src="{{ route('books.book.pdf', $bookId) }}#page={{ $lastPage }}&toolbar=0&view=FitH"
-                        class="w-full h-full"
-                        style="min-height:70vh; border:0;"
-                        sandbox="allow-same-origin allow-scripts"
-                        referrerpolicy="no-referrer"
-                        loading="lazy"
-                        oncontextmenu="return false;"
-                        onselectstart="return false;"
-                        onmousedown="return false;">
-                </iframe>
+            <div id="pdfViewer" class="w-full bg-gray-100 dark:bg-gray-900 rounded-lg border flex items-center justify-center" style="min-height:70vh;">
+                <div class="text-gray-500 dark:text-gray-400">جاري تحميل الكتاب...</div>
             </div>
         </div>
     </div>
@@ -55,37 +45,32 @@
             LAST_PAGE: {{ (int) ($lastPage ?? 1) }},
             LOCALE: "{{ app()->getLocale() }}",
             CSRF_TOKEN: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            BOOKS_JSON_URL: '/assets/book/books.json',
+            PDF_URL: "{{ route('books.book.pdf', $bookId) }}",
             SAVE_DEBOUNCE_TIME: 600,
             MAX_RETRIES: 3
         };
+
+        // إعداد PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         // عناصر DOM
         const elements = {
             prevBtn: document.getElementById('prevPage'),
             nextBtn: document.getElementById('nextPage'),
             pageNumInput: document.getElementById('pageNum'),
-            pageCountSpan: document.getElementById('pageCount'),
             totalPagesSpan: document.getElementById('totalPages'),
             saveStatus: document.getElementById('saveStatus'),
             titleEl: document.getElementById('bookTitle'),
-            iframe: document.getElementById('pdfIframe'),
+            pdfViewer: document.getElementById('pdfViewer'),
             errorBox: document.getElementById('errorBox'),
             loadingIndicator: document.getElementById('loadingIndicator')
         };
 
-        // إعداد PDF.js
-        const pdfjsLib = window['pdfjsLib'] || window['pdfjs-dist/build/pdf'];
-        if (pdfjsLib?.GlobalWorkerOptions) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        }
-
         // متغيرات الحالة
         let state = {
+            pdf: null,
             currentPage: Math.max(1, CONFIG.LAST_PAGE || 1),
             totalPages: 0,
-            pdfBuffer: null,
-            blobUrl: null,
             saveTimer: null,
             retryCount: 0
         };
@@ -120,18 +105,53 @@
             }
         }
 
-        function updateIframe() {
-            if (!state.blobUrl && state.pdfBuffer) {
-                const blob = new Blob([state.pdfBuffer], { type: 'application/pdf' });
-                state.blobUrl = URL.createObjectURL(blob);
-            }
-
-            if (state.blobUrl) {
-                const params = `#page=${state.currentPage}&zoom=page-width&toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0&view=FitH`;
-                elements.iframe.src = state.blobUrl + params;
-            }
-
+        function updateUI() {
+            elements.pageNumInput.value = state.currentPage;
+            elements.totalPagesSpan.textContent = state.totalPages;
             updateButtonStates();
+        }
+
+        // عرض الصفحة
+        async function renderPage(pageNumber) {
+            try {
+                showLoading(true);
+                const page = await state.pdf.getPage(pageNumber);
+                
+                // حساب المقياس بناء على عرض الحاوية
+                const viewport = page.getViewport({ scale: 1 });
+                const containerWidth = elements.pdfViewer.clientWidth - 40;
+                const scale = Math.min(containerWidth / viewport.width, 2);
+                const scaledViewport = page.getViewport({ scale });
+
+                // إنشاء canvas
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = scaledViewport.height;
+                canvas.width = scaledViewport.width;
+                canvas.style.maxWidth = '100%';
+                canvas.style.height = 'auto';
+                canvas.className = 'shadow-lg rounded-lg';
+
+                // عرض الصفحة
+                await page.render({
+                    canvasContext: context,
+                    viewport: scaledViewport
+                }).promise;
+
+                // تحديث المحتوى
+                elements.pdfViewer.innerHTML = '';
+                elements.pdfViewer.appendChild(canvas);
+                
+                updateUI();
+                elements.saveStatus.textContent = `صفحة ${pageNumber} من ${state.totalPages}`;
+                
+            } catch (error) {
+                console.error('خطأ في عرض الصفحة:', error);
+                showError('خطأ في عرض الصفحة');
+                elements.saveStatus.textContent = 'خطأ في العرض';
+            } finally {
+                showLoading(false);
+            }
         }
 
         // حفظ التقدم مع معالجة الأخطاء
@@ -147,7 +167,6 @@
             }
 
             try {
-                showLoading(true);
                 elements.saveStatus.textContent = 'جاري الحفظ...';
 
                 const response = await fetch(`/${CONFIG.LOCALE}/books/${CONFIG.BOOK_ID}/progress`, {
@@ -178,35 +197,30 @@
                 } else {
                     elements.saveStatus.textContent = 'تعذر الحفظ';
                 }
-            } finally {
-                showLoading(false);
             }
         }
 
         // دوال التنقل
-        function showPrevPage() {
+        async function showPrevPage() {
             if (state.currentPage <= 1) return;
             state.currentPage--;
-            elements.pageNumInput.value = state.currentPage;
-            updateIframe();
+            await renderPage(state.currentPage);
             debounceSave(state.currentPage);
         }
 
-        function showNextPage() {
+        async function showNextPage() {
             if (state.currentPage >= state.totalPages) return;
             state.currentPage++;
-            elements.pageNumInput.value = state.currentPage;
-            updateIframe();
+            await renderPage(state.currentPage);
             debounceSave(state.currentPage);
         }
 
-        function jumpToPage(num) {
+        async function jumpToPage(num) {
             const pageNum = Math.min(state.totalPages, Math.max(1, parseInt(num || 1)));
             if (pageNum === state.currentPage) return;
 
             state.currentPage = pageNum;
-            elements.pageNumInput.value = state.currentPage;
-            updateIframe();
+            await renderPage(state.currentPage);
             debounceSave(state.currentPage);
         }
 
@@ -215,96 +229,31 @@
             try {
                 hideError();
                 showLoading(true);
+                elements.saveStatus.textContent = 'جاري تحميل الكتاب...';
 
-                // جلب بيانات الكتب
-                const booksResponse = await fetch(CONFIG.BOOKS_JSON_URL, {
-                    cache: 'no-cache',
-                    headers: { 'Accept': 'application/json' }
-                });
-
-                if (!booksResponse.ok) {
-                    throw new Error('تعذر تحميل قائمة الكتب');
-                }
-
-                const books = await booksResponse.json();
-                const book = (Array.isArray(books) ? books : []).find(b =>
-                    b && Number(b.id) === Number(CONFIG.BOOK_ID)
-                );
-
-                if (!book?.pdf) {
-                    throw new Error('لم يتم العثور على رابط PDF لهذا الكتاب');
-                }
-
-                // تحديث العنوان
-                if (book.title) {
-                    elements.titleEl.textContent = `قراءة: ${book.title}`;
-                    document.title = `${book.title} - قارئ PDF`;
-                }
-
-                // طلب توكن عبر AJAX أولاً (الـ controller يعيد توكن عند الطلبات AJAX)
-                let token = '{{ $pdfToken ?? "" }}';
-                try {
-                    const tokenResp = await fetch(book.pdf, {
-                        method: 'GET',
-                        credentials: 'same-origin',
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Accept': 'application/json'
-                        }
-                    });
-
-                    if (tokenResp.ok) {
-                        const json = await tokenResp.json().catch(() => ({}));
-                        if (json && json.token) token = json.token;
-                    }
-                } catch (err) {
-                    // فشل الحصول على التوكن — سنحاول المتابعة بدون توكن
-                    console.warn('تعذر الحصول على توكن PDF:', err);
-                }
-
-                // الآن نطلب الملف الفعلي بصيغة ثنائية مع توكن الجلسة (إن وُجد)
-                const pdfResponse = await fetch(book.pdf, {
-                    cache: 'no-store',
-                    credentials: 'same-origin',
-                    headers: token ? { 'X-PDF-Token': token } : {}
-                });
-
-                if (!pdfResponse.ok) {
-                    throw new Error(`تعذر تحميل ملف PDF (HTTP ${pdfResponse.status})`);
-                }
-
-                state.pdfBuffer = await pdfResponse.arrayBuffer();
-
-                // استخراج عدد الصفحات
-                if (!pdfjsLib) {
-                    throw new Error('تعذر تحميل مكتبة PDF.js');
-                }
-
+                // تحميل PDF مباشرة
                 const loadingTask = pdfjsLib.getDocument({
-                    data: new Uint8Array(state.pdfBuffer),
+                    url: CONFIG.PDF_URL,
                     cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
                     cMapPacked: true,
                     standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/',
-                    enableXfa: true,
-                    fontExtraProperties: true,
+                    withCredentials: true
                 });
 
-                const pdfDoc = await loadingTask.promise;
-                state.totalPages = pdfDoc.numPages || 0;
-                elements.totalPagesSpan.textContent = state.totalPages;
+                state.pdf = await loadingTask.promise;
+                state.totalPages = state.pdf.numPages;
+                state.currentPage = Math.min(CONFIG.LAST_PAGE, state.totalPages);
 
-                // تحديد الصفحة الحالية
-                state.currentPage = Math.min(state.totalPages || 1, Math.max(1, state.currentPage || 1));
-                elements.pageNumInput.value = state.currentPage;
                 elements.pageNumInput.max = state.totalPages;
+                elements.titleEl.textContent = `قراءة الكتاب - ${state.totalPages} صفحة`;
 
-                updateIframe();
-
+                // عرض الصفحة الحالية
+                await renderPage(state.currentPage);
+                
             } catch (error) {
-                showError(error.message || 'تعذر تحميل أو عرض الكتاب');
-                elements.totalPagesSpan.textContent = '0';
-            } finally {
-                showLoading(false);
+                console.error('خطأ في تحميل PDF:', error);
+                showError('تعذر تحميل الكتاب. تأكد من وجود الملف.');
+                elements.saveStatus.textContent = 'فشل التحميل';
             }
         }
 
@@ -337,14 +286,18 @@
                 }
             });
 
+            // تحديث الحجم عند تغيير حجم النافذة
+            window.addEventListener('resize', () => {
+                if (state.pdf && state.currentPage) {
+                    renderPage(state.currentPage);
+                }
+            });
+
             // حفظ عند إغلاق الصفحة
             window.addEventListener('beforeunload', () => {
                 if (state.saveTimer) {
                     clearTimeout(state.saveTimer);
                     saveProgress(state.currentPage);
-                }
-                if (state.blobUrl) {
-                    URL.revokeObjectURL(state.blobUrl);
                 }
             });
         }

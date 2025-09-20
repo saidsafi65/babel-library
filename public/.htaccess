@@ -5,31 +5,24 @@
 
     RewriteEngine On
 
+    # Headers للأمان
     <IfModule mod_headers.c>
         <FilesMatch "\.(pdf)$">
-            Header set X-Content-Type-Options "nosniff"
+            Header always set X-Content-Type-Options "nosniff"
         </FilesMatch>
     </IfModule>
 
-    # منع الوصول المباشر لملفات PDF
-    RewriteCond %{REQUEST_URI} \.(pdf)$ [NC]
-    RewriteCond %{HTTP_USER_AGENT} IDM|"Internet Download Manager"|"Download Manager" [NC]
-    RewriteRule .* - [F,L]
+    # منع برامج التحميل فقط
+    RewriteCond %{HTTP_USER_AGENT} "IDM|Internet Download Manager|Download Manager|wget|curl|aria2" [NC]
+    RewriteRule ^.*\.(pdf)$ - [F,L]
 
-    # منع الوصول المباشر للملفات في مجلد assets
-    RewriteRule ^assets/.*\.(pdf|jpg|png)$ index.php [L]
-
-    # توجيه كل طلبات PDF إلى المتحكم
-    RewriteCond %{REQUEST_URI} \.(pdf)$ [NC]
-    RewriteRule .* index.php [L]
+    # توجيه ملفات PDF للمتحكم
+    RewriteRule ^storage/book/.*\.pdf$ index.php [L]
+    RewriteRule ^assets/book/.*\.pdf$ index.php [L]
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-
-    # Handle X-XSRF-Token Header
-    RewriteCond %{HTTP:x-xsrf-token} .
-    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
@@ -41,3 +34,6 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# منع عرض محتويات المجلدات
+Options -Indexes
